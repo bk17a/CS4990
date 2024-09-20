@@ -1,6 +1,7 @@
 import requests
 import pandas as pd
 from config import API_KEY
+from movie_titles import movie_titles
 
 
 def get_movie_data(title):
@@ -14,27 +15,20 @@ def get_movie_data(title):
 
 
 def get_dataset(filename, rows=None):
-    movie_titles = [
-        "Avengers: Endgame",
-        "Avengers: Infinity War",
-        "The Avengers",
-        "Avengers: Age of Ultron",
-        "Iron Man",
-        "Thor: Ragnarok",
-        "Captain America: Civil War",
-        "Guardians of the Galaxy Vol. 3",
-        "Spider-Man: No Way Home",
-        "Spider-Man: Far From Home",
-        "Spider-Man: No Way Home",
-        "The Amazing Spider-Man",
-        "The Amazing Spider-Man 2",
-        "Spider-Man: Homecoming",
-    ]
     movie_data = []
 
     for title in movie_titles:
         data = get_movie_data(title)
         if data:
+            rotten_tomatoes_rating = "N/A"
+            metacritic_rating = "N/A"
+
+            for rating in data.get("Ratings", []):
+                if rating["Source"] == "Rotten Tomatoes":
+                    rotten_tomatoes_rating = rating["Value"]
+                elif rating["Source"] == "Metacritic":
+                    metacritic_rating = rating["Value"]
+
             movie_data.append(
                 {
                     "Title": data.get("Title"),
@@ -43,10 +37,24 @@ def get_dataset(filename, rows=None):
                     "Rated": data.get("Rated"),
                     "Released": data.get("Released"),
                     "Genre": data.get("Genre"),
+                    "RottenTomatoesRating": rotten_tomatoes_rating,
+                    "MetacriticRating": metacritic_rating,
                     "imdbRating": data.get("imdbRating"),
+                    "imdbVotes": data.get("imdbVotes"),
                     "imdbID": data.get("imdbID"),
                     "BoxOffice": data.get("BoxOffice"),
-                    "Awards": data.get("Awards"),
+                    "Awards": (
+                        data.get("Awards")
+                        if data.get("Awards") != "N/A"
+                        else "No Awards"
+                    ),
+                    "Director": data.get("Director"),
+                    "Writer": data.get("Writer"),
+                    "Actors": data.get("Actors"),
+                    "Plot": data.get("Plot"),
+                    "Language": data.get("Language"),
+                    "Country": data.get("Country"),
+                    "Type:": data.get("Type"),
                 }
             )
 
