@@ -35,7 +35,7 @@ for i, center in enumerate(centers):
 # Apply K-Medoids to numerical data
 k = 10  # Adjust the number of clusters based analysis
 medoids = kmedoids(data_list, k, manhattan_dist, n=100, eps=0.001)
-print("K-Medoids Medoids:")
+print("Cluster Centers from K-Medoids (Numerical):")
 for i, medoid in enumerate(medoids):
     formatted_medoid = ", ".join(f"{value:.4f}" for value in medoid)
     print(f"Medoid {i + 1}: [{formatted_medoid}]")
@@ -106,8 +106,8 @@ def compare_categories(a, b):
 
 
 # Choosing two movies to compare
-movie_a = df.iloc[0]
-movie_b = df.iloc[14]
+movie_a = df.iloc[4]
+movie_b = df.iloc[7]
 
 # Print the genres and ratings for debugging
 print(f"Movie A - Genre: {movie_a['Genre']}, Rated: {movie_a['Rated']}")
@@ -121,7 +121,7 @@ print(
 
 # Apply K-Medoids with compare_categories
 centroids = kmedoids(data_list, k, compare_categories, n=5)
-print("Cluster Centers from K-Medoids:")
+print("Cluster Centers from K-Medoids (Categorical):")
 for i, center in enumerate(centroids):
     formatted_center = ", ".join(f"{value:.4f}" for value in center)
-    print(f"Center {i + 1}: [{formatted_center}]")
+    print(f"Medoid {i + 1}: [{formatted_center}]")
