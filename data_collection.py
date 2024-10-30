@@ -2,8 +2,6 @@ import requests
 import pandas as pd
 from config import API_KEY
 from movie_titles import movie_titles
-import matplotlib.pyplot as plt
-import seaborn as sns
 
 
 def get_movie_data(title):
@@ -65,6 +63,6 @@ def get_dataset(filename, rows=None):
     df.to_csv(filename, index=False)
 
 
-# get_dataset("movies.csv", rows=None)
+get_dataset("movies.csv", rows=20)
 df = pd.read_csv("movies.csv")
 print(df)

@@ -1,5 +1,7 @@
 import random
 import math
+from collections import deque
+import numpy as np
 
 
 def dist(center, instance, columns):
@@ -65,11 +67,88 @@ def lloyds(data, k, columns, centers=None, n=None, eps=None):
 def dbscan(data, columns, eps, min_samples):
     # DO NOT CHANGE THE PRECEDING LINE
     # This function has to return a list of cluster centers (lists of floats of the same length as columns)
-    pass
+    data = np.array([d[columns] for d in data])
+    tags = [-1] * len(data)
+    cid = 0
+
+    def get_neighbors(p):
+        nbs = []
+        for i, pt in enumerate(data):
+            if np.linalg.norm(data[p] - pt) <= eps:
+                nbs.append(i)
+        return nbs
+
+    def build_cluster(idx, nbs):
+        tags[idx] = cid
+        q = deque(nbs)
+
+        while q:
+            n = q.popleft()
+            if tags[n] == -1:
+                tags[n] = cid
+                new_nbs = get_neighbors(n)
+                if len(new_nbs) >= min_samples:
+                    q.extend(new_nbs)
+            elif tags[n] == 0:
+                tags[n] = cid
+
+    for i in range(len(data)):
+        if tags[i] != -1:
+            continue
+        nbs = get_neighbors(i)
+        if len(nbs) >= min_samples:
+            cid += 1
+            build_cluster(i, nbs)
+        else:
+            tags[i] = 0
+
+    clusters = [[] for _ in range(cid)]
+    noise = []
+    for idx, label in enumerate(tags):
+        if label > 0:
+            clusters[label - 1].append(data[idx])
+        else:
+            noise.append(data[idx])
+
+    return clusters, noise
 
 
 # DO NOT CHANGE THE FOLLOWING LINE
 def kmedoids(data, k, distance, centers=None, n=None, eps=None):
     # DO NOT CHANGE THE PRECEDING LINE
     # This function has to return a list of k cluster centroids (data instances!)
-    pass
+    if centers is None:
+        centers = random.sample(data, k)
+    else:
+        centers = centers[:]
+
+    it = 0
+    while True:
+        clusters = [[] for _ in range(k)]
+        for instance in data:
+            distances = [distance(center, instance) for center in centers]
+            closest_center = distances.index(min(distances))
+            clusters[closest_center].append(instance)
+
+        total_movement = 0
+        for i in range(k):
+            if not clusters[i]:  # Empty cluster
+                continue
+            medoid, min_cost = None, float("inf")
+            for candidate in clusters[i]:
+                cost = sum(distance(candidate, other) for other in clusters[i])
+                if cost < min_cost:
+                    medoid, min_cost = candidate, cost
+            total_movement += distance(centers[i], medoid)
+            centers[i] = medoid
+
+        it += 1
+        if (n is not None and it >= n) or (eps is not None and total_movement < eps):
+            break
+
+    return centers
+
+
+# Helper distance function for k-medoids
+def manhattan_dist(instance1, instance2):
+    return sum(abs(a - b) for a, b in zip(instance1, instance2))
