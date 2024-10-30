@@ -26,7 +26,10 @@ data_list = normalized_data.tolist()  # Convert to a list of lists
 # Apply K-Means
 k = 10  # Adjust based on silhouette or other metric
 centers = lloyds(data_list, k, list(range(len(columns))), n=100)
-print("K-Means Cluster Centers:", centers)
+print("K-Means Cluster Centers:")
+for i, center in enumerate(centers):
+    formatted_center = ", ".join(f"{value:.4f}" for value in center)
+    print(f"Cluster {i + 1}: [{formatted_center}]")
 
 # Apply DBSCAN
 
