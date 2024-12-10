@@ -63,6 +63,6 @@ def get_dataset(filename, rows=None):
     df.to_csv(filename, index=False)
 
 
-get_dataset("movies.csv", rows=20)
+get_dataset("movies.csv", rows=100)
 df = pd.read_csv("movies.csv")
 print(df)

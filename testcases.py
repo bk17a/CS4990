@@ -1,233 +1,171 @@
-import math
-import matplotlib.pyplot as plt
-import numpy as np
-import random
-import clustering
-import pandas
 import sys
+import classification
+import pandas
+import numpy
+import random
+import json
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.naive_bayes import CategoricalNB
+from sklearn.preprocessing import OrdinalEncoder
 
-random.seed(0)
+
+# Naive Bayes using sklearn
+class NaiveBayes:
+    def fit(self, x, y):
+        # NB needs the categories to be converted to numbers
+        # The ordinal encoder does exactly that
+        self.encoder = OrdinalEncoder()
+        self.NB = CategoricalNB()
+        # encode the data
+        xenc = self.encoder.fit_transform(x)
+        # fit the naive bayes model
+        self.NB.fit(xenc, y)
+
+    def predict(self, x):
+        # to predict, we first need to encode the data (using the same encoder)
+        # and then predict using the NB model
+        return self.NB.predict(self.encoder.transform(x))
+
+    def to_dict(self):
+        # Just to have some representation for the classifier
+        return {"encoder": str(self.encoder), "nb": str(self.NB)}
 
 
-# Show a 2D scatterplot using two dimensions of the data
-# Each point is colored based on which cluster center it is closest to
-def plot(data, centers, x, y, scale=None):
-    def dist(point, center):
-        return math.sqrt((point[x] - center[0]) ** 2 + (point[y] - center[1]) ** 2)
+CATMAP = {"low": 0, "medium": 1, "high": 2}
+BINMAP = {False: 0, True: 1}
+COLORS = {0: "Red", 1: "Blue"}
 
-    xs, ys, colors = [], [], []
-    for d in data:
-        mind = None
-        cluster = None
-        for i, c in enumerate(centers):
-            delta = dist(d, c)
-            if mind is None or delta < mind:
-                mind = delta
-                cluster = i
-        xs.append(d[x])
-        ys.append(d[y])
-        colors.append(cluster)
 
-    cxs, cys, ccolors = [], [], []
-    for i, c in enumerate(centers):
-        cxs.append(c[0])
-        cys.append(c[1])
-        ccolors.append(i)
-    if scale is None:
-        fr = min(min(xs), min(ys), min(cxs), min(cys))
-        to = max(max(xs), max(ys), max(cys), max(cys))
-        range = to - fr
-        fr -= 0.01 * range
-        to += 0.01 * range
-    else:
-        fr, to = scale
-    plt.scatter(xs, ys, c=colors)
-    plt.scatter(cxs, cys, c=ccolors, marker="+")
-    plt.xlim((fr, to))
-    plt.ylim((fr, to))
+def plot(title, xs, ys, predys, mapping=CATMAP):
+    markers = dict(zip(set(ys), ["+", "_", "*", "^", "s", "D"]))
+    x1s = {}
+    x2s = {}
+    colors = {}
+    for m in markers:
+        x1s[m] = []
+        x2s[m] = []
+        colors[m] = []
+    for x, y, py in zip(xs, ys, predys):
+
+        x1s[y].append(mapping[x[0]] + random.gauss(0, 0.05))
+        x2s[y].append(mapping[x[1]] + random.gauss(0, 0.05))
+        colors[y].append(COLORS[py])
+    for m in markers:
+        plt.scatter(x1s[m], x2s[m], c=colors[m], marker=markers[m])
     plt.show()
 
 
-def show_centers(centers):
-    for i, c in enumerate(centers):
-        print(f"   cluster center {i+1}: {tuple(c)}")
+def evaluate(prefix, y, predy):
+    correct = 0
+    for p, v in zip(predy, y):
+        if p == v:
+            correct += 1
+    print("%sAccuracy: %.2f" % (prefix, correct * 1.0 / len(y)))
 
 
-LLOYD_TESTS = [
-    "Array test",
-    "Two clusters single step (before/after comparison)",
-    "Two clusters 2 steps",
-    "Three clusters single step (before/after comparison)",
-    "Three clusters 5 steps",
-    "Two clusters w/ epsilon",
-    "Three clusters w/ epsilon",
-    "Six clusters (4D)",
-    "Two clusters on 3-cluster data",
+def get_columns(rows, columns, single=False):
+    if single:
+        return [row[columns[0]] for row in rows]
+    return [[row[c] for c in columns] for row in rows]
+
+
+CLASSIFICATION_TESTS = [
+    "Predict class from two categories (1+2)",
+    "Predict class from two categories (3+4)",
+    "Predict class from all four categories",
+    "Predict class from three categories (2-4)",
+    "Predict class from two binary attributes (1+2)",
+    "Predict class from three binary attributes (3+4)",
+    "Predict class from wrong categorical attributes",
+    "Predict class from wrong binary attributes",
 ]
 
+MODELS = {"Decision Tree": classification.DecisionTree, "Naive Bayes": NaiveBayes}
 
-def lloyds_testcase(data, n, visualize=True):
-    print("running test:", LLOYD_TESTS[n])
+
+def classification_testcase(
+    training, validation, n, visualize=True, model="Decision Tree"
+):
+    print("running test:", CLASSIFICATION_TESTS[n])
     if n == 0:
-        rdata = [
-            [name, random.random() * random.random(), random.random() * 0.45 + 0.2]
-            for i, name in enumerate("abcdefghijklmnopqrstuvxyz")
-        ]
-        clusters = clustering.lloyds(data, 3, [1, 2], n=10)
-        if visualize:
-            plot(rdata, clusters, 1, 2, scale=(0, 1))
-        show_centers(clusters)
+        columns = ["cat1", "cat2"]
+        target = ["cls3"]
+        mapping = CATMAP
     elif n == 1:
-        centers = [[0.1, 0.05], [0.8, 0.9]]
-        if visualize:
-            plot(data, centers, 3, 4, scale=(0, 1))
-        centers = clustering.lloyds(data, 2, [3, 4], centers=centers, n=1)
-        if visualize:
-            plot(data, centers, 3, 4, scale=(0, 1))
-        show_centers(centers)
+        columns = ["cat3", "cat4"]
+        target = ["cls3"]
+        mapping = CATMAP
     elif n == 2:
-        centers = [[0.1, 0.05], [0.8, 0.9]]
-        centers = clustering.lloyds(data, 2, [3, 4], centers=centers, n=2)
-        if visualize:
-            plot(data, centers, 3, 4, scale=(0, 1))
-        show_centers(centers)
+        columns = ["cat1", "cat2", "cat3", "cat4"]
+        target = ["cls3"]
+        visualize = False
     elif n == 3:
-        centers = [[0.5, 0.1], [0.1, 0.1], [0.8, 0.4]]
-        if visualize:
-            plot(data, centers, 1, 2, scale=(0, 1))
-        centers = clustering.lloyds(data, 3, [1, 2], centers=centers, n=1)
-        if visualize:
-            plot(data, centers, 1, 2, scale=(0, 1))
-        show_centers(centers)
+        columns = ["cat2", "cat3", "cat4"]
+        target = ["cls3"]
+        visualize = False
     elif n == 4:
-        centers = [[0.5, 0.1], [0.1, 0.1], [0.8, 0.4]]
-        centers = clustering.lloyds(data, 3, [1, 2], centers=centers, n=5)
-        if visualize:
-            plot(data, centers, 1, 2, scale=(0, 1))
-        show_centers(centers)
+        columns = ["bin1", "bin2"]
+        target = ["cls4"]
+        mapping = BINMAP
     elif n == 5:
-        centers = clustering.lloyds(data, 2, ["x3", "x4"], eps=0.01)
-        if visualize:
-            plot(data, centers, "x3", "x4", scale=(0, 1))
-        show_centers(centers)
+        columns = ["bin3", "bin4", "bin5"]
+        target = ["cls4"]
+        visualize = False
     elif n == 6:
-        centers = clustering.lloyds(data, 3, ["x1", "x2"], eps=0.01)
-        if visualize:
-            plot(data, centers, "x1", "x2", scale=(0, 1))
-        show_centers(centers)
+        columns = ["bin1", "bin2", "bin3", "bin4", "bin5"]
+        target = ["cls4"]
+        visualize = False
     elif n == 7:
-        centers = clustering.lloyds(data, 6, ["x1", "x2", 3, "x4"], n=10)
-        show_centers(centers)
+        columns = ["cat1", "cat2"]
+        target = ["cls4"]
+        mapping = CATMAP
     elif n == 8:
-        centers = clustering.lloyds(data, 2, ["x1", "x2"], n=5)
-        if visualize:
-            plot(data, centers, "x1", "x2", scale=(0, 1))
-        show_centers(centers)
+        columns = ["bin1", "bin2", "bin3", "bin4", "bin5"]
+        target = ["cls3"]
+        visualize = False
+
+    m = MODELS[model]()
+    tx = get_columns(training, columns)
+    ty = get_columns(training, target, single=True)
+    m.fit(tx, ty)
+    print(json.dumps(m.to_dict(), indent=4))
+    predty = m.predict(tx)
+    evaluate(model + " training ", ty, predty)
+    vx = get_columns(validation, columns)
+    vy = get_columns(validation, target, single=True)
+    predvy = m.predict(vx)
+    evaluate(model + " validation ", vy, predvy)
+
+    if visualize:
+        plot(model + " training set", tx, ty, predty, mapping)
+        plot(model + " validation set", vx, vy, predvy, mapping)
 
 
-def lloyds_test(df, steps):
-    test_menu(df, steps, LLOYD_TESTS, lloyds_testcase)
-
-
-KMEDOIDS_TESTS = [
-    "Compare categories, single step",
-    "Compare categories, 5 steps",
-    "Compare binary, single step",
-    "Compare binary, 5 steps",
-    "Compare category and binary, single step",
-    "Compare category and binary, 5 steps (this does not cluster well)",
-]
-
-CATEGORY_MAP = {"low": 0, "medium": 0.5, "high": 1}
-
-
-def compare_categories(a, b):
-    def compare(cata, catb):
-        if cata == catb:
-            return 0
-        return abs(CATEGORY_MAP[cata] - CATEGORY_MAP[catb])
-
-    return (
-        sum([compare(a[col], b[col]) for col in ["cat1", "cat2", "cat3", "cat4"]]) / 4.0
-    )
-
-
-def compare_binary(a, b):
-    def compare(cata, catb):
-        if cata == catb:
-            return 0
-        return 1
-
-    return (
-        sum(
-            [
-                compare(a[col], b[col])
-                for col in ["bin1", "bin2", "bin3", "bin4", "bin5"]
-            ]
-        )
-        / 5.0
-    )
-
-
-def compare_both(a, b):
-    return (compare_categories(a, b) + compare_binary(a, b)) / 2.0
-
-
-def evaluate(data, centroids, distance, ground_truth):
-    clusters = [[] for c in centroids]
-    for d in data:
-        mind = distance(centroids[0], d)
-        idx = 0
-        for i, c in enumerate(centroids[1:]):
-            delta = distance(c, d)
-            if delta < mind:
-                mind = delta
-                idx = i + 1
-        clusters[idx].append(d)
-
-    for c in clusters:
-        ids = [tuple(d[ground_truth]) for d in c]
-        counts = []
-        for id in set(ids):
-            counts.append(ids.count(id))
-        if not counts:
-            print("No data instances in cluster")
+def main(auto=False, nb=False, steps=[]):
+    random.seed(1337)
+    df = pandas.read_csv("testdata.csv")
+    model = "Decision Tree"
+    if nb:
+        model = "Naive Bayes"
+    training = []
+    validation = []
+    for i, row in df.iterrows():
+        if random.random() > 0.85:
+            validation.append(row)
         else:
-            print("Agreement: %.2f%%" % (max(counts) * 100.0 / sum(counts)))
+            training.append(row)
 
-
-def kmedoids_testcase(data, n, visualize=True):
-    print("running test:", KMEDOIDS_TESTS[n])
-    if n == 0:
-        centroids = clustering.kmedoids(data, 2, compare_categories, n=1)
-        evaluate(data, centroids, compare_categories, ["cls3"])
-    if n == 1:
-        centroids = clustering.kmedoids(data, 2, compare_categories, n=5)
-        evaluate(data, centroids, compare_categories, ["cls3"])
-    elif n == 2:
-        centroids = clustering.kmedoids(data, 2, compare_binary, n=1)
-        evaluate(data, centroids, compare_binary, ["cls4"])
-    elif n == 3:
-        centroids = clustering.kmedoids(data, 2, compare_binary, n=5)
-        evaluate(data, centroids, compare_binary, ["cls4"])
-    elif n == 4:
-        centroids = clustering.kmedoids(data, 4, compare_binary, n=1)
-        evaluate(data, centroids, compare_binary, ["cls3", "cls4"])
-    elif n == 5:
-        centroids = clustering.kmedoids(data, 4, compare_binary, n=5)
-        evaluate(data, centroids, compare_binary, ["cls3", "cls4"])
-
-
-def kmedoids_test(df, steps):
-    test_menu(df, steps, KMEDOIDS_TESTS, kmedoids_testcase)
-
-
-def test_menu(df, steps, tests, function):
+    if auto:
+        for i, t in enumerate(CLASSIFICATION_TESTS):
+            print("-" * 80)
+            classification_testcase(training, validation, i, False, model)
+        return
+    tests = CLASSIFICATION_TESTS
     while True:
         print("Which test case do you want to run?")
         for i, t in enumerate(tests):
             print(f"   {i} {t}")
-        print("   r return to main menu")
         print("   q exit")
         if steps:
             x = steps[0]
@@ -235,65 +173,29 @@ def test_menu(df, steps, tests, function):
         else:
             x = input("> ")
         if x in [str(i) for i, _ in enumerate(tests)]:
-            function(df, int(x))
-        elif x == "r":
-            print()
-            return
+            classification_testcase(training, validation, int(x), model=model)
         elif x == "q":
             print("Bye")
-            exit(0)
+            sys.exit(0)
         else:
             print("Please select a test case, r or q")
         print()
 
 
-def main(auto=False, all=False, steps=[]):
-    df = pandas.read_csv("testdata.csv")
-    data = [item for (idx, item) in df.iterrows()]
-    if auto:
-        for i, t in enumerate(LLOYD_TESTS):
-            lloyds_testcase(data, i, False)
-        if all:
-            for i, t in enumerate(KMEDOIDS_TESTS):
-                kmedoids_testcase(data, i, False)
-        return
-    while True:
-        print("Which algorithm do you want to test?")
-        print("   0 Lloyd's")
-        print("   1 k-medoids")
-        print("   q none, exit")
-        if steps:
-            x = steps[0]
-            del steps[0]
-        else:
-            x = input("> ")
-        if x == "0":
-            lloyds_test(data, steps)
-        elif x == "1":
-            kmedoids_test(data, steps)
-        elif x == "q":
-            return
-        else:
-            print("Please select 0, 1 or q")
-
-
 if __name__ == "__main__":
     if "--help" in sys.argv:
-        print("Usage: testcases.py [--auto] [--all] [-a|--auto-all] steps")
+        print("Usage: testcases.py [--auto] steps")
         print("   --auto runs the tests automatically")
         print(
-            "   --all only works in combination with --auto and runs all tests (lloyds and kmedoids) together"
+            "   --naive-bayes uses the Naive Bayes classifier from sklearn; useful as a comparison"
         )
-        print("   -a and --auto-all are aliases for '--auto --all'")
         print(
             "   <steps> is a sequence of inputs that are passed to the menu before it accepts manual input."
         )
         print(
-            "           This allows you to run e.g. 'python testcases.py 02q' to select option 0 in the"
+            "           This allows you to run e.g. 'python testcases.py 12q' to run test cases 1 and 2"
         )
-        print(
-            "           main menu, followed by 2 in the Lloyd's test case menu, followed by q(uit)"
-        )
+        print("           in sequence, followed by q(uit)")
         print(
             "           Essentially, this allows you to repeatedly run any test/combination of tests without"
         )
@@ -301,7 +203,7 @@ if __name__ == "__main__":
         sys.exit(0)
     else:
         main(
-            "--auto" in sys.argv or "--auto-all" in sys.argv or "-a" in sys.argv,
-            "--all" in sys.argv or "--auto-all" in sys.argv or "-a" in sys.argv,
-            list("".join([arg for arg in sys.argv[1:] if "--" not in arg])),
+            "--auto" in sys.argv,
+            "--bayes" in sys.argv or "--naive-bayes" in sys.argv or "-n" in sys.argv,
+            list("".join([arg for arg in sys.argv[1:] if "-" not in arg])),
         )
